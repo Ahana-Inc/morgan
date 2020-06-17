@@ -78,6 +78,13 @@ function morgan (format, options) {
   // check if log entry should be skipped
   var skip = opts.skip || false
 
+  // configure if log should convert formatted log to
+  // string before writing to stream
+  var raw = opts.raw || false
+  if (raw && !opts.stream) {
+    throw new Error('Morgan must be configured with stream when writting raw logs')
+  }
+
   // format function
   var formatLine = typeof fmt !== 'function'
     ? getFormatFunction(fmt)
@@ -97,7 +104,7 @@ function morgan (format, options) {
       : buffer
 
     // swap the stream
-    stream = createBufferStream(stream, interval)
+    stream = createBufferStream(stream, interval, raw)
   }
 
   return function logger (req, res, next) {
@@ -127,7 +134,11 @@ function morgan (format, options) {
       }
 
       debug('log request')
-      stream.write(line + '\n')
+      if (raw) {
+        stream.write(line)
+      } else {
+        stream.write(line + '\n')
+      }
     };
 
     if (immediate) {
@@ -419,14 +430,18 @@ function compile (format) {
  * @public
  */
 
-function createBufferStream (stream, interval) {
+function createBufferStream (stream, interval, raw) {
   var buf = []
   var timer = null
 
   // flush function
   function flush () {
     timer = null
-    stream.write(buf.join(''))
+    if (raw) {
+      stream.write(buf)
+    } else {
+      stream.write(buf.join(''))
+    }
     buf.length = 0
   }
 

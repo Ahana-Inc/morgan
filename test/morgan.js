@@ -1048,6 +1048,32 @@ describe('morgan()', function () {
           .expect(200, cb)
       })
 
+      it('should log result of function without newline', function (done) {
+        var expectedResult = { sample: 'code' }
+        var cb = after(2, function (err, res, line) {
+          if (err) return done(err)
+          assert.strictEqual(line, expectedResult)
+          done()
+        })
+
+        function writeLog (log) {
+          cb(null, null, log)
+        }
+
+        function format (tokens, req, res) {
+          return expectedResult
+        }
+
+        var server = createServer(format, {
+          raw: true,
+          stream: { write: writeLog }
+        })
+
+        request(server)
+          .get('/')
+          .expect(200, cb)
+      })
+
       it('should not log for undefined return', function (done) {
         var stream = createLineStream(function () {
           throw new Error('should not log line')
@@ -1387,6 +1413,37 @@ describe('morgan()', function () {
       })
       var server = createServer(':method :url', {
         buffer: true,
+        stream: { write: writeLog }
+      })
+      var time = Date.now()
+
+      function writeLog (log) {
+        cb(null, null, log)
+      }
+
+      request(server)
+        .get('/first')
+        .expect(200, function (err) {
+          if (err) return cb(err)
+          request(server)
+            .get('/second')
+            .expect(200, cb)
+        })
+    })
+
+    it('should flush log periodically as array', function (done) {
+      var cb = after(2, function (err, res, log) {
+        if (err) return done(err)
+        assert.ok(Array.isArray(log))
+        assert.strictEqual(log[0], 'GET /first')
+        assert.strictEqual(log[1], 'GET /second')
+        assert.ok(Date.now() - time >= 1000)
+        assert.ok(Date.now() - time <= 1100)
+        done()
+      })
+      var server = createServer(':method :url', {
+        buffer: true,
+        raw: true,
         stream: { write: writeLog }
       })
       var time = Date.now()
